@@ -4,7 +4,7 @@ module FSM_Processo (
    Sensor_Garrafa_Cheia, Rolha_Disponivel, Botao_Vedar, 
 	Botao_Enter_CQ, Input_Qualidade_OK, Botao_Lacre_e_Conta,
    output Comando_Mover_Esteira, Valv_Enchimento, Atuador_Vedacao, 
-   Dec_Rolha, LED_Alarme, LED_Descarte, Inc_Duzia,
+   Dec_Rolha, LED_Descarte, Inc_Duzia,
 	output [2:0] saida_estado_atual
 );
     reg [2:0] estado_atual, proximo_estado;

@@ -66,8 +66,9 @@ module Automatizacao_Esteira_Vinho (
         .Comando_Mover_Esteira(w_comando_mover_esteira), 
         .Valv_Enchimento(VALVULA_ENCHIMENTO), 
         .Atuador_Vedacao(ATUADOR_VEDACAO), 
-        .Dec_Rolha(w_dec_rolha), .LED_Alarme(LED_ALARME_ROLHA), 
-        .LED_Descarte(LED_DESCARTE), .Inc_Duzia(w_inc_duzia),
+        .Dec_Rolha(w_dec_rolha), 
+        .LED_Descarte(LED_DESCARTE), 
+		  .Inc_Duzia(w_inc_duzia),
 		  .saida_estado_atual(w_fsm_estado_atual)
     );
 
@@ -87,6 +88,7 @@ module Automatizacao_Esteira_Vinho (
 		 .start_proc(w_start),
 		 .contagem(w_contagem_rolhas),
 		 .disp_acionado(DISPENSADOR_ROLHAS),
+		 .LED_Alarme(LED_ALARME_ROLHA),
 		 .rolha_disponivel(w_rolha_disponivel)
 	 );
 
