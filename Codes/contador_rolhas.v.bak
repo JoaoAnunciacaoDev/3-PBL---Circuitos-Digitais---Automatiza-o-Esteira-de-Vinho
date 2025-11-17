@@ -1,0 +1,30 @@
+module contador_rolhas (
+    input clk, reset, dec, add_manual, start_proc,
+    output [7:0] contagem,
+    output disp_acionado, rolha_disponivel
+);
+
+    parameter CONTAGEM_MINIMA = 5,
+				  RECARGA_AUTO = 15;
+    
+    assign rolha_disponivel = (contagem > 0);
+
+    always @(posedge clk or posedge reset) begin
+        if (reset || start_proc) begin
+            contagem <= 20;
+            disp_acionado <= 1'b0;
+        end else begin
+            disp_acionado <= 1'b0;
+
+            if (contagem <= CONTAGEM_MINIMA && !disp_acionado) begin
+                contagem <= contagem + RECARGA_AUTO;
+                disp_acionado <= 1'b1;
+            end else if (dec && rolha_disponivel) begin
+                contagem <= contagem - 1;
+            end else if (add_manual) begin
+                contagem <= contagem + 1;
+            end
+        end
+    end
+	 
+endmodule
