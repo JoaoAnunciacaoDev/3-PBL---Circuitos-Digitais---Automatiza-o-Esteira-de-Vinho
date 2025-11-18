@@ -1,0 +1,366 @@
+module Automatizacao_Esteira_Vinho (
+    // Entradas Globais
+    input CLOCK_50,
+    input [0:0] KEY, // KEY[0] é o Reset (ativo em baixo)
+
+    // Entradas de Sensores e Comandos (usaremos chaves para simular)
+    input [9:0] SW,
+
+    // Saídas
+    output [9:0] LEDR, // LEDs para feedback
+    output [6:0] HEX0, HEX1, HEX2, HEX3 // Displays para rolhas e dúzias
+);
+
+    // --- Sinais e Mapeamento de Hardware ---
+    wire reset_n = KEY[0]; // Reset é ativo em baixo
+
+    // Mapeando chaves para simular botões e sensores
+    wire start_btn           = SW[0];
+    wire add_rolha_manual_sw = SW[7];
+    
+    wire sensor_pos_enchimento = SW[1];
+    wire sensor_garrafa_cheia  = SW[2];
+    wire sensor_pos_cq         = SW[3];
+    wire input_qualidade_ok  = SW[4]; // 1 = Aprovado, 0 = Reprovado
+    wire sensor_pos_lacre_eb   = SW[5]; // Sensor final EB
+
+    // --- Fios de Conexão Interna ---
+    wire pulso_start, pulso_add_rolha;
+    wire comando_mover_esteira, motor_pausado_em_posicao;
+    wire valv_enchimento, valv_vedacao, alarme_falta_rolha, led_descarte;
+    wire menos_rolha, incrementa_duzia;
+    wire rolha_disponivel;
+    wire [7:0] contagem_rolhas_bcd, contagem_duzias_bcd;
+
+
+    // --- Instanciação dos Módulos ---
+
+    // Módulo para tratar os botões e gerar pulsos limpos
+    botao_handler handle_start_btn (
+        .clk(CLOCK_50), .rst_n(reset_n), 
+        .botao_in(start_btn), .pulso_out(pulso_start)
+    );
+    botao_handler handle_add_rolha_sw (
+        .clk(CLOCK_50), .rst_n(reset_n), 
+        .botao_in(add_rolha_manual_sw), .pulso_out(pulso_add_rolha)
+    );
+
+    // FSM do Motor (O "Músculo")
+    FSM_Motor motor_control (
+        .clk(CLOCK_50), .Reset(~reset_n), // Note: FSMs usam reset ativo em alto
+        .Comando_Mover_Esteira(comando_mover_esteira),
+        .Sensor_Pos_Enchimento(sensor_pos_enchimento),
+        .Sensor_Pos_CQ(sensor_pos_cq),
+        .Sensor_Pos_Lacre(sensor_pos_lacre_eb),
+        .Motor_Ligar(LEDR[0]), // Conecta saída do motor ao LEDR[0]
+        .Motor_Pausado_Em_Posicao(motor_pausado_em_posicao)
+    );
+
+    // FSM do Processo (O "Cérebro")
+    FSM_Cerebro_Processo cerebro_control (
+        .clk(CLOCK_50), .Reset(~reset_n),
+        .Start_Pressionado(pulso_start),
+        .Motor_Pausado_Em_Posicao(motor_pausado_em_posicao),
+        .Sensor_Garrafa_Cheia(sensor_garrafa_cheia),
+        .Rolha_Disponivel(rolha_disponivel),
+        .Botao_Vedar(1'b1), // Simplificação: vedação automática
+        .Botao_Enter_CQ(1'b1), // Simplificação: CQ automático
+        .Input_Qualidade_OK(input_qualidade_ok),
+        .Botao_Lacre_e_Conta(sensor_pos_lacre_eb), // Contagem automática no sensor
+        .Comando_Mover_Esteira(comando_mover_esteira),
+        .Valv_Enchimento(valv_enchimento),
+        .Valv_Vedacao(valv_vedacao),
+        // O alarme agora vem do gerenciador de rolhas, não mais do cérebro
+        .Menos_Rolha(menos_rolha),
+        .LED_Descarte(led_descarte),
+        .Incrementa_Duzia(incrementa_duzia)
+    );
+
+    // Módulo Gerenciador de Rolhas
+    gerenciador_rolhas rolhas_control (
+        .clk(CLOCK_50), .rst_n(reset_n),
+        .pulso_decrementa(menos_rolha),
+        .pulso_add_manual(pulso_add_rolha),
+        .contagem_bcd_out(contagem_rolhas_bcd),
+        .rolha_disponivel_out(rolha_disponivel),
+        .alarme_out(alarme_falta_rolha),
+        .dispensador_out(LEDR[3]) // Aciona LEDR[3] quando o dispensador atua
+    );
+
+    // Módulo Contador de Dúzias
+    contador_duzias duzias_control (
+        .clk(CLOCK_50), .rst_n(reset_n),
+        .pulso_incrementa(incrementa_duzia),
+        .contagem_bcd_out(contagem_duzias_bcd)
+    );
+
+    // Módulo de Display
+    display_4_digitos display_control (
+        .clk(CLOCK_50), .rst_n(reset_n),
+        .valor_duzias_bcd(contagem_duzias_bcd),
+        .valor_rolhas_bcd(contagem_rolhas_bcd),
+        .HEX0(HEX0), .HEX1(HEX1), .HEX2(HEX2), .HEX3(HEX3)
+    );
+    
+    // LEDs de Feedback para os atuadores
+    assign LEDR[1] = valv_enchimento;
+    assign LEDR[2] = valv_vedacao;
+    assign LEDR[8] = alarme_falta_rolha;
+    assign LEDR[9] = led_descarte;
+
+endmodule
+
+
+//****************************************************************************
+// Módulos de Suporte (Botões, Contadores, Display)
+//****************************************************************************
+
+module botao_handler (
+    input clk, rst_n, 
+    input botao_in,
+    output reg pulso_out
+);
+    reg [15:0] contador_debounce;
+    wire clk_debounce;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            contador_debounce <= 16'd0;
+        else if (contador_debounce == 16'd49999)
+            contador_debounce <= 16'd0;
+        else
+            contador_debounce <= contador_debounce + 1;
+    end
+    assign clk_debounce = (contador_debounce == 16'd49999);
+    
+    reg [2:0] shift_reg;
+    wire botao_limpo;
+    reg  botao_limpo_anterior;
+
+    assign botao_limpo = (&shift_reg);
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            shift_reg <= 3'b0;
+            botao_limpo_anterior <= 1'b0;
+            pulso_out <= 1'b0;
+        end
+        else begin
+            if (clk_debounce) begin
+                shift_reg <= {shift_reg[1:0], botao_in};
+            end
+            botao_limpo_anterior <= botao_limpo;
+            if (botao_limpo == 1'b1 && botao_limpo_anterior == 1'b0) begin
+                pulso_out <= 1'b1;
+            end
+            else begin
+                pulso_out <= 1'b0;
+            end
+        end
+    end
+endmodule
+
+// Função para converter um número binário de 8 bits para 2 dígitos BCD
+function [7:0] bin_para_bcd (input [7:0] bin);
+    reg [3:0] bcd_unidades, bcd_dezenas;
+    begin
+        bcd_dezenas = bin / 10;
+        bcd_unidades = bin % 10;
+        bin_para_bcd = {bcd_dezenas, bcd_unidades};
+    end
+endfunction
+
+module gerenciador_rolhas(
+    input clk, rst_n,
+    input pulso_decrementa,
+    input pulso_add_manual,
+    output [7:0] contagem_bcd_out,
+    output rolha_disponivel_out,
+    output alarme_out,
+    output dispensador_out
+);
+    reg [6:0] contagem_bin; // Contador interno em binário (0-99)
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            contagem_bin <= 20; // Valor inicial
+        end else begin
+            if (pulso_decrementa && contagem_bin > 0)
+                contagem_bin <= contagem_bin - 1;
+            
+            if (pulso_add_manual && contagem_bin < 99)
+                contagem_bin <= contagem_bin + 1;
+
+            if (dispensador_out) // Se o dispensador for ativado...
+                if (contagem_bin + 15 > 99) // ...evita overflow
+                    contagem_bin <= 99;
+                else
+                    contagem_bin <= contagem_bin + 15;
+        end
+    end
+
+    assign dispensador_out = (contagem_bin <= 5);
+    assign rolha_disponivel_out = (contagem_bin > 0);
+    assign alarme_out = (contagem_bin == 0);
+
+    assign contagem_bcd_out = bin_para_bcd(contagem_bin);
+endmodule
+
+module contador_duzias (
+    input clk, rst_n,
+    input pulso_incrementa,
+    output [7:0] contagem_bcd_out
+);
+    reg [3:0] contagem_garrafas;
+    reg [6:0] contagem_duzias_bin; // Contador interno em binário (0-99)
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            contagem_garrafas <= 0;
+            contagem_duzias_bin <= 0;
+        end else if (pulso_incrementa) begin
+            if (contagem_garrafas == 11) begin
+                contagem_garrafas <= 0;
+                if (contagem_duzias_bin == 9) // Se chegar a 10 dúzias (0 a 9)
+                    contagem_duzias_bin <= 0; // Reinicia
+                else
+                    contagem_duzias_bin <= contagem_duzias_bin + 1;
+            end else begin
+                contagem_garrafas <= contagem_garrafas + 1;
+            end
+        end
+    end
+    
+    assign contagem_bcd_out = bin_para_bcd(contagem_duzias_bin);
+endmodule
+
+module display_4_digitos (
+    input clk, rst_n,
+    input [7:0] valor_duzias_bcd,
+    input [7:0] valor_rolhas_bcd,
+    output reg [6:0] HEX0, HEX1, HEX2, HEX3
+);
+    // Este módulo será uma cópia simplificada do que vimos anteriormente,
+    // mas direcionando a saída para os 4 displays separadamente.
+    // Lógica para decodificar BCD para 7 segmentos
+    function [6:0] decodificador_7seg (input [3:0] bcd_in);
+        case(bcd_in)
+            4'h0: decodificador_7seg = 7'b1000000; // 0
+            4'h1: decodificador_7seg = 7'b1111001; // 1
+            4'h2: decodificador_7seg = 7'b0100100; // 2
+            4'h3: decodificador_7seg = 7'b0110000; // 3
+            4'h4: decodificador_7seg = 7'b0011001; // 4
+            4'h5: decodificador_7seg = 7'b0010010; // 5
+            4'h6: decodificador_7seg = 7'b0000010; // 6
+            4'h7: decodificador_7seg = 7'b1111000; // 7
+            4'h8: decodificador_7seg = 7'b0000000; // 8
+            4'h9: decodificador_7seg = 7'b0010000; // 9
+            default: decodificador_7seg = 7'b1111111; // Off
+        endcase
+    endfunction
+
+    // Atribui cada dígito BCD ao seu respectivo display
+    always @(*) begin
+        // HEX3 e HEX2 mostram as Dúzias
+        HEX3 = decodificador_7seg(valor_duzias_bcd[7:4]); // Dezena
+        HEX2 = decodificador_7seg(valor_duzias_bcd[3:0]); // Unidade
+
+        // HEX1 e HEX0 mostram as Rolhas
+        HEX1 = decodificador_7seg(valor_rolhas_bcd[7:4]); // Dezena
+        HEX0 = decodificador_7seg(valor_rolhas_bcd[3:0]); // Unidade
+    end
+endmodule
+
+
+//****************************************************************************
+// Módulos de Controle (As Máquinas de Estado)
+//****************************************************************************
+
+module FSM_Motor (
+    input clk, Reset,
+    input Comando_Mover_Esteira,
+    input Sensor_Pos_Enchimento, Sensor_Pos_CQ, Sensor_Pos_Lacre,
+    output reg Motor_Ligar,
+    output reg Motor_Pausado_Em_Posicao
+);
+    reg [1:0] estado_atual, proximo_estado;
+    parameter PARADO = 2'b00, ANDANDO = 2'b01, PAUSADO = 2'b10;
+
+    always @(posedge clk or posedge Reset) begin
+        if (Reset) estado_atual <= PARADO;
+        else estado_atual <= proximo_estado;
+    end
+
+    always @(*) begin
+        proximo_estado = estado_atual;
+        case (estado_atual)
+            PARADO: if (Comando_Mover_Esteira) proximo_estado = ANDANDO;
+            ANDANDO: if (!Comando_Mover_Esteira || Sensor_Pos_Enchimento || Sensor_Pos_CQ || Sensor_Pos_Lacre) proximo_estado = PAUSADO;
+            PAUSADO: if (Comando_Mover_Esteira) proximo_estado = ANDANDO;
+        endcase
+    end
+
+    always @(*) begin
+        Motor_Ligar = 1'b0; Motor_Pausado_Em_Posicao = 1'b0;
+        case (estado_atual)
+            ANDANDO: Motor_Ligar = 1'b1;
+            PAUSADO: Motor_Pausado_Em_Posicao = 1'b1;
+        endcase
+    end
+endmodule
+
+module FSM_Cerebro_Processo (
+    input clk, Reset,
+    input Start_Pressionado, Motor_Pausado_Em_Posicao, Sensor_Garrafa_Cheia,
+    input Rolha_Disponivel, Botao_Vedar, Botao_Enter_CQ, Input_Qualidade_OK,
+    input Botao_Lacre_e_Conta,
+    output reg Comando_Mover_Esteira, Valv_Enchimento, Valv_Vedacao,
+    output reg Menos_Rolha, LED_Descarte, Incrementa_Duzia
+);
+    reg [2:0] estado_atual, proximo_estado;
+    parameter PARADO = 3'b000, ENCHENDO = 3'b001, AGUARDANDO_VEDACAO = 3'b010,
+              AGUARDANDO_CQ = 3'b100, AGUARDANDO_LACRE = 3'b101;
+
+    always @(posedge clk or posedge Reset) begin
+        if (Reset) estado_atual <= PARADO;
+        else estado_atual <= proximo_estado;
+    end
+
+    always @(*) begin
+        proximo_estado = estado_atual;
+        case (estado_atual)
+            PARADO: if (Start_Pressionado) proximo_estado = ENCHENDO;
+            ENCHENDO: if (Motor_Pausado_Em_Posicao && Sensor_Garrafa_Cheia) proximo_estado = AGUARDANDO_VEDACAO;
+            AGUARDANDO_VEDACAO: if (Botao_Vedar && Rolha_Disponivel) proximo_estado = AGUARDANDO_CQ;
+            AGUARDANDO_CQ: begin
+                if (Motor_Pausado_Em_Posicao && Botao_Enter_CQ) begin
+                    if (Input_Qualidade_OK) proximo_estado = AGUARDANDO_LACRE;
+                    else proximo_estado = ENCHENDO;
+                end
+            end
+            AGUARDANDO_LACRE: if (Motor_Pausado_Em_Posicao && Botao_Lacre_e_Conta) proximo_estado = ENCHENDO;
+        endcase
+    end
+
+    always @(*) begin
+        Comando_Mover_Esteira=0; Valv_Enchimento=0; Valv_Vedacao=0;
+        Menos_Rolha=0; LED_Descarte=0; Incrementa_Duzia=0;
+        case (estado_atual)
+            PARADO: if (Start_Pressionado) Comando_Mover_Esteira = 1'b1;
+            ENCHENDO: if (Motor_Pausado_Em_Posicao) Valv_Enchimento = 1'b1;
+            AGUARDANDO_VEDACAO:
+                if (Botao_Vedar && Rolha_Disponivel) begin
+                    Valv_Vedacao = 1'b1; Menos_Rolha = 1'b1; Comando_Mover_Esteira = 1'b1;
+                end
+            AGUARDANDO_CQ:
+                if (Motor_Pausado_Em_Posicao && Botao_Enter_CQ) begin
+                    if (!Input_Qualidade_OK) LED_Descarte = 1'b1;
+                    Comando_Mover_Esteira = 1'b1;
+                end
+            AGUARDANDO_LACRE:
+                if (Motor_Pausado_Em_Posicao && Botao_Lacre_e_Conta) begin
+                    Incrementa_Duzia = 1'b1; Comando_Mover_Esteira = 1'b1;
+                end
+        endcase
+    end
+endmodule
