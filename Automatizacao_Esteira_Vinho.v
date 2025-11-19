@@ -4,7 +4,9 @@ module Automatizacao_Esteira_Vinho (
 
     output LED_MOTOR, LED_ALARME_ROLHA, LED_DESCARTE, VALVULA_ENCHIMENTO, ATUADOR_VEDACAO, DISPENSADOR_ROLHAS,
     output [6:0] HEX0, HEX1, HEX4, HEX5, HEX2, HEX3,
-	 output [2:0] Estado_Atual
+	 output [2:0] Estado_Atual,
+	 output [3:0] VGA_R, VGA_G, VGA_B,
+    output VGA_HS, VGA_VS
 );
 
     wire w_comando_mover_esteira, w_rolha_disponivel, w_dec_rolha, w_inc_duzia, w_start_pressionado, clk_lento,

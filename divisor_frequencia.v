@@ -17,16 +17,20 @@ module reg_mealy (L, clk, P);
 
     input L, clk;
     output P;
-	 
-	 reg flag_capturada;
-	 
-	 always @(negedge P)
-    
-    wire qn_to_and;
-    
-    my_dff D0 (.DFF_CLOCK(clk), .D(L), .Qn(qn_to_and));
-    
-    and (P, L, qn_to_and);
+
+    reg flag_capturada = 1'b0;
+
+    always @(posedge clk) begin
+        if (L == 1'b1) begin
+            flag_capturada <= 1'b1;
+        end
+    end
+
+    always @(negedge clk) begin
+        flag_capturada <= 1'b0;
+    end
+
+    assign P = flag_capturada;
 
 endmodule
 
