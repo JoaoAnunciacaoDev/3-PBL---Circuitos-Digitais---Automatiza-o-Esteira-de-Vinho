@@ -1,19 +1,25 @@
 module debounce_better_version (input pb_1, clk, slow_clk_en, output pb_out);
 
-	wire Q1,Q2,Q2_bar,Q0;
-	my_dff_en d0(clk,slow_clk_en,pb_1,Q0);
+	reg_mealy_ltp (pb_1, slow_clk_en, pb_out);
 
-	my_dff_en d1(clk,slow_clk_en,Q0,Q1);
-	my_dff_en d2(clk,slow_clk_en,Q1,Q2);
-	assign Q2_bar = ~Q2;
-	assign pb_out = Q1 & Q2_bar;
-	
 endmodule
 
-// D-flip-flop with clock enable signal for debouncing module 
+module reg_mealy_ltp (L, clk, P);
+
+    input L, clk;
+    output P;
+    
+    wire qn_to_and;
+    
+    my_dff D0 (.DFF_CLOCK(clk), .D(L), .Qn(qn_to_and));
+    
+    and (P, L, qn_to_and);
+
+endmodule
+
 module my_dff_en(input DFF_CLOCK, clock_enable,D, output reg Q=0);
     always @ (posedge DFF_CLOCK) begin
-  if(clock_enable==1) 
-           Q <= D;
-    end
+		 if(clock_enable == 1) 
+			Q <= D;
+		 end
 endmodule 

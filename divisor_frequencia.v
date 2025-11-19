@@ -4,12 +4,9 @@ module divisor_frequencia (L, clk, P, rst);
     output P;
     
     wire rst_n;
-    wire [24:0] q_bar, q_out;
-
     not (rst_n, rst);
     
-    reg_mealy (.L(L), .clk(q_out[24]), .P(P));
-    ckt5_CA (.clk(clk), .rst_n(rst_n), .j(1'b1), .k(1'b1), .q(q_out), .q_bar(q_bar));
+    reg_mealy (.L(L), .clk(clk), .P(P));
 
 endmodule
 
@@ -21,23 +18,17 @@ module reg_mealy (L, clk, P);
     reg flag_capturada = 1'b0;
 
     always @(posedge clk) begin
-        if (L == 1'b1) begin
-            flag_capturada <= 1'b1;
-        end
+        flag_capturada <= L;
     end
 
-    always @(negedge clk) begin
-        flag_capturada <= 1'b0;
-    end
-
-    assign P = flag_capturada;
+	 or (P, flag_capturada, L);
 
 endmodule
 
 module ckt5_CA (
-    input clk, rst_n,
-    input j, k,
-    output [24:0] q, q_bar
+    input clk, rst_n, j, k,
+    output [24:0] q, q_bar,
+	 output clk_lento
 );
 
     flipflop_jk jk1(clk, rst_n, j, k, q[0], q_bar[0]);
@@ -66,6 +57,8 @@ module ckt5_CA (
 	 flipflop_jk jk23(q_bar[21], rst_n, j, k, q[22], q_bar[22]);
     flipflop_jk jk24(q_bar[22], rst_n, j, k, q[23], q_bar[23]);
     flipflop_jk jk25(q_bar[23], rst_n, j, k, q[24], q_bar[24]);
+	 
+	 assign clk_lento = q[24];
 
 endmodule
 
@@ -90,14 +83,5 @@ module flipflop_jk (
 		 end
      
     assign q_bar = ~q;
-     
-endmodule
-
-module my_dff ( input DFF_CLOCK , D , output reg Q, output wire Qn ) ;
-    always @ ( posedge DFF_CLOCK ) begin
-        Q <= D;
-    end
-     
-     assign Qn = ~Q;
      
 endmodule

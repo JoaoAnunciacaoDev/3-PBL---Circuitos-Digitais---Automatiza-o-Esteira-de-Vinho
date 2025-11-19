@@ -6,7 +6,7 @@ module Automatizacao_Esteira_Vinho (
     output [6:0] HEX0, HEX1, HEX4, HEX5, HEX2, HEX3,
 	 output [2:0] Estado_Atual,
 	 output [3:0] VGA_R, VGA_G, VGA_B,
-    output VGA_HS, VGA_VS
+    output VGA_HS, VGA_VS, clk_lento_saida
 );
 
     wire w_comando_mover_esteira, w_rolha_disponivel, w_dec_rolha, w_inc_duzia, w_start_pressionado, clk_lento,
@@ -23,7 +23,8 @@ module Automatizacao_Esteira_Vinho (
 	 wire w_estado_100;
 	 wire w_estado_101;
 
-	 not (w_start_pressionado, w_start);
+	 not (w_start_pressionado, KEY_START);
+	 not (w_reset_negado, RESET);
 	 
 	 not (not_q2, w_fsm_estado_atual[2]);
 	 not (not_q1, w_fsm_estado_atual[1]);
@@ -37,27 +38,35 @@ module Automatizacao_Esteira_Vinho (
 	 and (w_motor_parado_pos_enchimento, not_led_motor, w_estado_001, SENSOR_POS_ENCHIMENTO);
 	 and (w_motor_parado_pos_cq, not_led_motor, w_estado_100, SENSOR_POS_CQ);
 	 and (w_motor_parado_pos_lacre, not_led_motor, w_estado_101, SENSOR_POS_LACRE);
+	 
+	 wire sensor_enchimento_relevante, sensor_cq_relevante, sensor_lacre_relevante;
+	 
+	 and (sensor_enchimento_relevante, SENSOR_POS_ENCHIMENTO, w_estado_001);
+	 and (sensor_cq_relevante, SENSOR_POS_CQ, w_estado_100);
+	 and (sensor_lacre_relevante, SENSOR_POS_LACRE, w_estado_101);
 
-	 or g7 (w_sensor_esteira_ativado, SENSOR_POS_ENCHIMENTO, SENSOR_POS_CQ, SENSOR_POS_LACRE);
+	 or g7 (w_sensor_esteira_ativado, sensor_enchimento_relevante, sensor_cq_relevante, sensor_lacre_relevante);
 	 
-	 wire w_reset, w_start, w_key_vedar, w_key_enter_cq, w_key_lacre, w_add_rolha, w_qualidade_ok;
+	 wire w_reset, w_start, w_key_vedar, w_key_enter_cq, w_key_lacre, w_add_rolha, w_qualidade_ok, w_reset_negado;
 	 
-	 clock_enable (.Clk_100M(CLK), .slow_clk_en(clk_lento));
+	 //clock_enable (.Clk_100M(CLK), .slow_clk_en(clk_lento));
+	 ckt5_CA (.clk(CLK), .rst_n(1'b1), .j(1'b1), .k(1'b1), .clk_lento(clk_lento));
+	 assign clk_lento_saida = w_start_pressionado;
 	 
-	 debounce_better_version reset_debounce(.pb_1(RESET), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_reset));
-	 debounce_better_version start_debounce(.pb_1(KEY_START), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_start));
+	 //debounce_better_version reset_debounce(.pb_1(RESET), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_reset));
+	 //debounce_better_version start_debounce(.pb_1(KEY_START), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_start));
 	 //debounce_better_version vedar_debounce(.pb_1(KEY_VEDAR), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_vedar));
 	 //debounce_better_version enter_debounce(.pb_1(KEY_ENTER_CQ), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_enter_cq));
 	 //debounce_better_version lacre_debounce(.pb_1(KEY_LACRE_CONTA), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_lacre));
 	 debounce_better_version add_rolha_debounce(.pb_1(SW_ADD_ROLHA), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_add_rolha));
 	 //debounce_better_version qualidade_ok_debounce(.pb_1(SW_QUALIDADE_OK), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_qualidade_ok));
     
-	 divisor_frequencia (.L(w_led_descarte), .clk(CLK), .P(LED_DESCARTE), .rst(RESET));
+	 divisor_frequencia (.L(w_led_descarte), .clk(clk_lento), .P(LED_DESCARTE), .rst(w_reset_negado));
 	 
     FSM_Processo fsm_p (
         .clk(clk_lento), 
-		  .Reset(w_reset), 
-		  .Start_Pressionado(w_start),
+		  .Reset(w_reset_negado), 
+		  .Start_Pressionado(w_start_pressionado),
         .Motor_Parado_Pos_Enchimento(w_motor_parado_pos_enchimento),
         .Motor_Parado_Pos_CQ(w_motor_parado_pos_cq),
         .Motor_Parado_Pos_Lacre(w_motor_parado_pos_lacre),
@@ -78,7 +87,7 @@ module Automatizacao_Esteira_Vinho (
 
     FSM_Motor fsm_m (
         .clk(clk_lento), 
-		  .Reset(w_reset),
+		  .Reset(w_reset_negado),
         .Comando_Mover_Esteira(w_comando_mover_esteira),
         .Sensor_Ativado(w_sensor_esteira_ativado),
         .Motor(LED_MOTOR)
@@ -86,10 +95,10 @@ module Automatizacao_Esteira_Vinho (
 
     contador_rolhas contador_r (
 		 .clk(clk_lento), 
-		 .reset(w_reset),
+		 .reset(w_reset_negado),
 		 .dec(w_dec_rolha),
 		 .add_manual(w_add_rolha),
-		 .start_proc(w_start),
+		 .start_proc(w_start_pressionado),
 		 .contagem(w_contagem_rolhas),
 		 .estoque(w_estoque),
 		 .disp_acionado(DISPENSADOR_ROLHAS),
@@ -99,7 +108,7 @@ module Automatizacao_Esteira_Vinho (
 
     contador_duzias contador_d (
         .clk(clk_lento), 
-		  .reset(w_reset),
+		  .reset(w_reset_negado),
         .inc(w_inc_duzia),
         .start_proc(w_start_pressionado),
         .contagem(w_contagem_duzias)

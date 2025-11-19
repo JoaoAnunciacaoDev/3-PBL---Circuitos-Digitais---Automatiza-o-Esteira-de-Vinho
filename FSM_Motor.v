@@ -32,7 +32,7 @@ module FSM_Motor (
 				default: proximo_estado = PARADO;
         endcase
     end
-
-   buf (Motor, estado_atual);
-     
+	 
+   assign Motor = estado_atual;
+	
 endmodule

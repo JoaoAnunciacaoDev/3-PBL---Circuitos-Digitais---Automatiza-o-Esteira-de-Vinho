@@ -11,7 +11,7 @@ module contador_rolhas (
     parameter VALOR_INICIAL   = 5'd6;
     parameter CONTAGEM_MINIMA = 5'd5;
     parameter RECARGA_AUTO    = 5'd15;
-	 parameter ESTOQUE_INICIAL = 6'd1;
+	 parameter ESTOQUE_INICIAL = 6'd10;
 
     assign rolha_disponivel = (contagem > 0);
 	 assign LED_Alarme = (contagem == 0 && estoque == 0);
