@@ -1,12 +1,12 @@
 module contador_duzias (
-    input clk, reset, inc, start_proc,
+    input clk, reset, inc,
     output reg [3:0] contagem
 );
 
     parameter MAX_DUZIAS = 9;
 	 
-    always @(posedge clk or posedge reset or posedge start_proc) begin
-        if (reset || start_proc) begin
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
             contagem <= 4'd0;
         end else if (inc) begin
             if (contagem == MAX_DUZIAS) begin

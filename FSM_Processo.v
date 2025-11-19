@@ -2,9 +2,10 @@ module FSM_Processo (
 	input clk, Reset, Start_Pressionado, 
 	Motor_Parado_Pos_Enchimento, Motor_Parado_Pos_CQ, Motor_Parado_Pos_Lacre,
    Sensor_Garrafa_Cheia, Rolha_Disponivel, Botao_Vedar, 
-	Botao_Enter_CQ, Input_Qualidade_OK, Botao_Lacre_e_Conta,
+	Botao_Enter_CQ, Input_Qualidade_OK, Botao_Lacre_e_Conta, alarme_rolha,
+	
    output Comando_Mover_Esteira, Valv_Enchimento, Atuador_Vedacao, 
-   Dec_Rolha, LED_Descarte, Inc_Duzia,
+   Dec_Rolha, LED_Descarte, Inc_Duzia, LED_Alarme,
 	output [2:0] saida_estado_atual
 );
     reg [2:0] estado_atual, proximo_estado;
@@ -19,7 +20,7 @@ module FSM_Processo (
     always @(posedge clk or posedge Reset)
         if (Reset)
             estado_atual <= PARADO;
-        else
+        else if (!alarme_rolha)
             estado_atual <= proximo_estado;
 
     always @(*)
@@ -74,7 +75,7 @@ module FSM_Processo (
 	 assign Atuador_Vedacao = (estado_atual == AGUARDANDO_VEDACAO && Botao_Vedar && Rolha_Disponivel);
 	 assign Dec_Rolha = Atuador_Vedacao;
 	 assign LED_Alarme = (estado_atual == FALTA_ROLHA);
-	 assign LED_Descarte = (estado_atual == AGUARDANDO_CQ && Motor_Parado_Pos_CQ && Botao_Enter_CQ && !Input_Qualidade_OK);
+	 assign LED_Descarte = (estado_atual == AGUARDANDO_CQ && !alarme_rolha && Motor_Parado_Pos_CQ && Botao_Enter_CQ && !Input_Qualidade_OK);
 	 assign Inc_Duzia = (estado_atual == AGUARDANDO_LACRE && Motor_Parado_Pos_Lacre && Botao_Lacre_e_Conta);
 	 
 endmodule
