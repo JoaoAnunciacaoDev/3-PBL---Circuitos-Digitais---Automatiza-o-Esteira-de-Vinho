@@ -1,0 +1,10 @@
+module square_check (
+	input [31:0] xi, yi, xf, yf, x_atual, y_atual,
+	output esta_dentro
+);
+
+	always @(*) begin
+		if (x_atual >= xi &&  x_atual <= xf)
+			if (y_atual >= yi &&  y_atual <= yf)
+
+endmodule
