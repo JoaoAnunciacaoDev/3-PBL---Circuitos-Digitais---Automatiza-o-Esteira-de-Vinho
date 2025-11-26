@@ -15,10 +15,7 @@ module top (
 	output clock_lento_teste,
 
    //////////// KEYs //////////
-   input      [1:0]    KEY,    // two board-level push buttons KEY1 - KEY0
-
-   //////////// SWs //////////
-   input      [2:0]    SW
+   input      [1:0]    KEY   // two board-level push buttons KEY1 - KEY0
 );
 
 	parameter PARADO                  = 3'b000, 
