@@ -5,7 +5,7 @@ module Automatizacao_Esteira_Vinho (
     output LED_MOTOR, LED_ALARME_ROLHA, LED_DESCARTE, VALVULA_ENCHIMENTO, ATUADOR_VEDACAO, DISPENSADOR_ROLHAS,
     output [6:0] HEX0, HEX1, HEX4, HEX5, HEX2, HEX3,
 	 output [2:0] Estado_Atual,
-	 output clk_lento_saida
+	 output clk_lento_saida, Motor_Parado_Pos_Enchimento, Motor_Parado_Pos_CQ, Motor_Parado_Pos_Lacre
 );
 
     wire w_comando_mover_esteira, w_rolha_disponivel, w_dec_rolha, w_inc_duzia, w_start_pressionado, clk_lento,
@@ -37,6 +37,10 @@ module Automatizacao_Esteira_Vinho (
 	 and (w_motor_parado_pos_cq, not_led_motor, w_estado_100, SENSOR_POS_CQ);
 	 and (w_motor_parado_pos_lacre, not_led_motor, w_estado_101, SENSOR_POS_LACRE);
 	 
+	 assign Motor_Parado_Pos_Enchimento = w_motor_parado_pos_enchimento;
+	 assign Motor_Parado_Pos_CQ = w_motor_parado_pos_cq;
+	 assign Motor_Parado_Pos_Lacre = w_motor_parado_pos_lacre;
+	 
 	 wire sensor_enchimento_relevante, sensor_cq_relevante, sensor_lacre_relevante;
 	 
 	 and (sensor_enchimento_relevante, SENSOR_POS_ENCHIMENTO, w_estado_001);
@@ -56,7 +60,7 @@ module Automatizacao_Esteira_Vinho (
 	 //debounce_better_version reset_debounce(.pb_1(RESET), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_reset));
 	 //debounce_better_version start_debounce(.pb_1(KEY_START), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_start));
 	 //debounce_better_version vedar_debounce(.pb_1(KEY_VEDAR), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_vedar));
-	 //debounce_better_version enter_debounce(.pb_1(KEY_ENTER_CQ), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_enter_cq));
+	 debounce_better_version enter_debounce(.pb_1(KEY_ENTER_CQ), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_enter_cq));
 	 //debounce_better_version lacre_debounce(.pb_1(KEY_LACRE_CONTA), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_key_lacre));
 	 debounce_better_version add_rolha_debounce(.pb_1(SW_ADD_ROLHA), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_add_rolha));
 	 debounce_better_version sensor_garrafa_cheia_debounce(.pb_1(SENSOR_GARRAFA_CHEIA), .clk(CLK), .slow_clk_en(clk_lento), .pb_out(w_sensor_garrafa_cheia));
@@ -75,7 +79,7 @@ module Automatizacao_Esteira_Vinho (
         .Sensor_Garrafa_Cheia(w_sensor_garrafa_cheia),
         .Rolha_Disponivel(w_rolha_disponivel),
         .Botao_Vedar(KEY_VEDAR), 
-		  .Botao_Enter_CQ(KEY_ENTER_CQ), 
+		  .Botao_Enter_CQ(w_key_enter_cq), 
         .Input_Qualidade_OK(SW_QUALIDADE_OK),
         .Botao_Lacre_e_Conta(KEY_LACRE_CONTA),
 		  .alarme_rolha(w_alarme_rolha),

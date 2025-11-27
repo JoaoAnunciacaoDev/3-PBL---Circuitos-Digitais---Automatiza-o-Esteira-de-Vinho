@@ -7,10 +7,10 @@ module contador_rolhas (
 );
 
     parameter MAX_ROLHAS      = 5'd31;
-    parameter VALOR_INICIAL   = 5'd1;
+    parameter VALOR_INICIAL   = 5'd6;
     parameter CONTAGEM_MINIMA = 5'd5;
     parameter RECARGA_AUTO    = 5'd15;
-	 parameter ESTOQUE_INICIAL = 6'd0;
+	 parameter ESTOQUE_INICIAL = 6'd15;
 
     assign rolha_disponivel = (contagem > 0);
 	 assign disp_acionado = (contagem <= CONTAGEM_MINIMA && estoque > 0);
